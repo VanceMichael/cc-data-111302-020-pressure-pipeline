@@ -1,0 +1,10 @@
+{
+  "count": 20,
+  "recordBytes": 128,
+  "chunkBytes": 32,
+  "delay": 0,
+  "sinkDelay": 0,
+  "dropAck": false,
+  "accepted": {},
+  "rejectBatch": false
+}
