@@ -4,7 +4,7 @@ import {createHash} from 'node:crypto';
 import { gzipSync } from 'node:zlib';
 import { once } from 'node:events';
 export function json(response,value,status=200){response.writeHead(status,{'Content-Type':'application/json; charset=utf-8'});response.end(JSON.stringify(value));}
-export async function createSource(){
+export async function createSource({port=0,host='127.0.0.1'}={}){
   const state=JSON.parse(await readFile(new URL('../fixtures/source.json',import.meta.url),'utf8'));
   
   const pages={};
@@ -33,6 +33,6 @@ export async function createSource(){
       return json(response,{error:'资源不存在'},404);
     }catch(error){if(!response.headersSent)json(response,{error:error.message},500);else response.destroy();}
   });
-  await new Promise(resolve=>server.listen(0,'0.0.0.0',resolve));
+  await new Promise(resolve=>server.listen(port,host,resolve));
   return {url:`http://127.0.0.1:${server.address().port}`,state,close:async()=>{server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}};
 }
