@@ -4,6 +4,9 @@ import {createHash} from 'node:crypto';
 import { gzipSync } from 'node:zlib';
 import { once } from 'node:events';
 export function json(response,value,status=200){response.writeHead(status,{'Content-Type':'application/json; charset=utf-8'});response.end(JSON.stringify(value));}
+// 记录内容:默认高可压缩('x'重复);noise=true 时用确定性的伪随机十六进制,
+// 压缩率接近随机数据,且重启后内容不变,恢复路径可以安全重放。
+function recordValue(state,index,size){if(!state.noise)return 'x'.repeat(size);let out='';let seed=`seed-${index}`;while(out.length<size){out+=createHash('sha256').update(seed).digest('hex');seed=out.slice(-64);}return out.slice(0,size);}
 export async function createSource({port=0,host='127.0.0.1'}={}){
   const state=JSON.parse(await readFile(new URL('../fixtures/source.json',import.meta.url),'utf8'));
   
@@ -20,7 +23,8 @@ export async function createSource({port=0,host='127.0.0.1'}={}){
       
     if(url.pathname==='/stream'){
       response.setHeader('Content-Type','application/x-ndjson');response.setHeader('Content-Encoding','gzip');
-      const raw=Array.from({length:state.count},(_,index)=>JSON.stringify({id:`r${index}`,value:'x'.repeat(state.recordBytes)})+'\n').join('');const data=gzipSync(raw);
+      const sizes=Array.isArray(state.recordSizes)&&state.recordSizes.length>0?state.recordSizes:Array.from({length:state.count},()=>state.recordBytes);
+      const raw=sizes.map((size,index)=>JSON.stringify({id:`r${index}`,value:recordValue(state,index,Math.max(0,size))})+'\n').join('');const data=gzipSync(raw);
       for(let offset=0;offset<data.length;offset+=state.chunkBytes){if(response.destroyed)break;if(!response.write(data.subarray(offset,offset+state.chunkBytes)))await once(response,'drain');if(state.delay)await new Promise(resolve=>setTimeout(resolve,state.delay));}return response.end();
     }
     if(url.pathname==='/sink'&&request.method==='POST'){
